@@ -1,0 +1,16 @@
+# Vagrantfile for Backup VM
+
+Vagrant.configure("2") do |config|
+	config.vm.define "backupServer" do |backup|
+	  backupServer.vm.box = "ubuntu/bionic64"
+	  backupServer.vm.provider "aws" do |aws|
+		aws.region = "eu-central-1"
+		aws.instance_type = "t2.micro"
+		aws.iam_instance_profile_name = "turbitec2"
+	  end
+	  backupServer.vm.provision "ansible" do |ansible|
+		ansible.playbook = "backup-playbook.yml"
+	  end
+	end
+  end
+  

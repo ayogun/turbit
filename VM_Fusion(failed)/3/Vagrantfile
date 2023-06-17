@@ -1,0 +1,46 @@
+  Vagrant.configure("2") do |config| 
+
+	config.vm.define "vpn" do |vpn|
+	  vpn.vm.box = "klinvill/kali_arm"
+	  vpn.vm.hostname = "vpn-vm"
+	  vpn.vm.network "private_network", ip: "172.16.16.30" # bug
+	  vpn.vm.network "public_network", bridge: "en0"
+	  vpn.ssh.username = "vagrant"
+	  vpn.ssh.password = "vagrant"	# This is not best practice, but it's a lab.
+
+	  vpn.vm.provider "vmware_desktop" do |v|
+		v.vmx["numvcpus"] = "2"
+		v.vmx["memsize"] = "2048"
+		v.gui = true
+	  end
+	  vpn.vm.provision "ansible" do |ansible|
+		ansible.playbook = "server.yml"
+		ansible.groups = {
+			"servergroup" => ["vpn-vm"]
+		}
+	  end
+	end
+
+	config.vm.define "ca" do |ca|
+		ca.vm.box = "klinvill/kali_arm"
+		ca.vm.hostname = "ca-vm"
+		ca.vm.network "private_network", ip: "172.16.16.40"
+		ca.vm.network "public_network", bridge: "en0"
+		ca.ssh.username = "vagrant"
+		ca.ssh.password = "vagrant"	# This is not best practice, but it's a lab.
+		
+		ca.vm.provider "vmware_desktop" do |v|
+		  v.vmx["numvcpus"] = "2"
+		  v.vmx["memsize"] = "2048"
+		  v.gui = true
+		end
+		ca.vm.provision "ansible" do |ansible|
+		  ansible.playbook = "ca.yml"
+		  ansible.groups = {
+			  "cagroup" => ["ca-vm"]
+		  }
+		end
+	end
+
+
+end

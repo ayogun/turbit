@@ -1,0 +1,17 @@
+# Vagrantfile for VPN Server
+
+Vagrant.configure("2") do |config|
+	config.vm.define "vpn" do |vpn|
+	  vpn.vm.box = "ubuntu/bionic64"
+	  vpn.vm.provider "aws" do |aws|
+		aws.access_key_id = "<AWS_ACCESS_KEY>"
+		aws.secret_access_key = "<AWS_SECRET_ACCESS_KEY>"
+		aws.region = "eu-central-1"
+		aws.instance_type = "t2.micro"
+	  end
+	  vpn.vm.provision "ansible" do |ansible|
+		ansible.playbook = "vpn-playbook.yml"
+	  end
+	end
+  end
+  

@@ -1,0 +1,347 @@
+---
+
+
+- name: Configure VPN server
+  hosts: openvpn_server
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      become: true
+
+    - name: Install OpenVPN
+      apt:
+        name:
+           - openvpn
+           - easy-rsa
+        state: present
+        update_cache: yes
+    
+    - name: Create EasyRSA directory
+      file:
+        path: ~/easy-rsa
+        state: directory
+        owner: vagrant
+        mode: 700
+
+    -name: Create symlink to EasyRSA scripts
+      file:
+        src: /usr/share/easy-rsa/
+        dest: ~/easy-rsa
+        state: link
+        owner: vagrant
+
+    - name: Insert vars into vars file
+      blockinfile:
+        path: ~/easy-rsa/vars
+        block: |
+          set_var EASYRSA_ALGO "ec"
+          set_var EASYRSA_DIGEST "sha512"
+
+    - name: Initialize PKI
+      become: true
+      become_user: vagrant
+      command: ./easyrsa init-pki
+      args:
+        chdir: ~/easy-rsa
+
+    - name: Generate server key request
+      become: true
+      become_user: vagrant
+      command: ./easyrsa gen-req server nopass
+      args:
+        chdir: ~/easy-rsa
+
+    - name: Copy server key to OpenVPN directory
+      become: true
+      become_user: root
+      command: sudo cp /home/vagrant/easy-rsa/pki/private/server.key /etc/openvpn/server/
+
+- name: Copy server certificate request to CA server
+  hosts: openvpn_server
+  become: false
+  gather_facts: false
+  tasks:
+   - name: Copy server.req to CA server
+     synchronize:
+       src: "/home/vagrant/easy-rsa/pki/reqs/server.req"
+       dest: "/tmp/server.req"
+     delegate_to: {{ca_server_ip}}
+     remote_user: vagrant
+
+- name: Sign the certificate request on CA server
+  hosts: ca_server
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Import certificate request
+      command: "./easyrsa import-req /tmp/server.req server"
+      args:
+        chdir: "~/easy-rsa"
+
+    - name: Sign the certificate request
+      command: "./easyrsa sign-req server server"
+      args:
+        chdir: "~/easy-rsa"
+      expect:
+        command: "./easyrsa sign-req server server"
+        responses:
+          'Type the word '\''yes'\'' to continue, or any other input to abort.': 'yes'
+
+- name: Copy signed server certificate and CA certificate to OpenVPN server
+  hosts: openvpn_server
+  become: true
+  tasks:
+    - name: Copy server.crt from CA server
+      synchronize:
+        src: "/home/vagrant/easy-rsa/pki/issued/server.crt"
+        dest: "/tmp/server.crt"
+      delegate_to: {{ca_server_ip}}
+      remote_user: vagrant
+
+    - name: Copy ca.crt from CA server
+      synchronize:
+        src: "/home/vagrant/easy-rsa/pki/ca.crt"
+        dest: "/tmp/ca.crt"
+      delegate_to: {{ca_server_ip}}
+      remote_user: vagrant
+
+    - name: Copy certificates to OpenVPN server
+      copy:
+        src: "/tmp/{{ item }}"
+        dest: "/etc/openvpn/server/{{ item }}"
+      loop:
+        - server.crt
+        - ca.crt
+
+    - name: Generate tls-crypt pre-shared key
+      become: true
+      become_user: root
+      command: openvpn --genkey --secret ta.key
+      args:
+        chdir: ~/easy-rsa
+
+    - name: Copy tls-crypt pre-shared key to OpenVPN server
+      become: true
+      become_user: root
+      copy:
+        src: "~/easy-rsa/ta.key"
+        dest: "/etc/openvpn/server/ta.key"
+
+    - name: Create client configuration directory
+      file:
+        path: "~/client-configs/keys"
+        state: directory
+
+    - name: Set permissions for client configuration directory
+      file:
+        path: "~/client-configs"
+        state: directory
+        mode: "0700"
+
+    - name: Generate client key and certificate request
+      command: "./easyrsa gen-req client1 nopass"
+      args:
+        chdir: "~/easy-rsa"
+
+    - name: Copy client key to client configuration directory
+      copy:
+        src: "pki/private/client1.key"
+        dest: "~/client-configs/keys/client1.key"
+
+    - name: Transfer client certificate request to CA Server
+      command: "scp pki/reqs/client1.req vagrant@{{ca_server_ip}}:/tmp"
+      delegate_to: {{ca_server_ip}}
+
+    - name: Import client certificate request on CA Server
+      command: "./easyrsa import-req /tmp/client1.req client1"
+      args:
+        chdir: "~/easy-rsa"
+      delegate_to: {{ca_server_ip}}
+
+    - name: Sign client certificate request on CA Server
+      command: "./easyrsa sign-req client client1"
+      args:
+        chdir: "~/easy-rsa"
+      register: sign_output
+      ignore_errors: true
+      delegate_to: {{ca_server_ip}}
+
+    - name: Confirm signing of client certificate request
+      expect:
+        command: "echo 'yes' | ./easyrsa sign-req client client1"
+        responses:
+          "Type the word 'yes' to continue, or any other input to abort.": "yes"
+      when: "'Type the word' in sign_output.stderr"
+      delegate_to: {{ca_server_ip}}
+
+    - name: Transfer signed client certificate back to OpenVPN server
+      command: "scp pki/issued/client1.crt vagrant@your_server_ip:/tmp"
+
+    - name: Copy client certificate to client configuration directory
+      copy:
+        src: "/tmp/client1.crt"
+        dest: "~/client-configs/keys/"
+
+    - name: Copy ca.crt and ta.key files to client configuration directory
+      copy:
+        src: "~/easy-rsa/ta.key"
+        dest: "~/client-configs/keys/"
+        mode: "0600"
+        owner: "vagrant"
+        group: "vagrant"
+
+    - name: Copy ca.crt to client configuration directory (using sudo)
+      become: true
+      copy:
+        src: "/etc/openvpn/server/ca.crt"
+        dest: "~/client-configs/keys/"
+        mode: "0600"
+        owner: "vagrant"
+        group: "vagrant"
+
+    - name: Copy sample server.conf file
+      copy:
+        src: "/usr/share/doc/openvpn/examples/sample-config-files/server.conf.gz"
+        dest: "/etc/openvpn/server/"
+        remote_src: true
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Extract server.conf file
+      command: "gunzip /etc/openvpn/server/server.conf.gz"
+      become: true
+
+    - name: Open and edit server.conf file
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        regexp: "^tls-auth"
+        line: ";tls-auth ta.key 0"
+        state: present
+      become: true
+
+    - name: Add tls-crypt directive to server.conf file
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        line: "tls-crypt ta.key"
+        state: present
+      become: true
+
+    - name: Comment out default cipher
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        regexp: "^cipher"
+        line: ";cipher AES-256-CBC"
+        state: present
+      become: true
+
+    - name : Add new cipher
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        line: "cipher AES-256-GCM"
+        state: present
+      become: true
+    
+    - name: Add auth directive
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        line: "auth SHA256"
+        state: present
+      become: true
+
+    - name: Comment out existin dh directive
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        regexp: "^dh"
+        line: ";dh dh.pem"
+        state: present
+      become: true
+
+    - name: Add dh directive with "none"
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        line: "dh none"
+        state: present
+      become: true
+
+    - name: Uncomment user directive
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        regexp: ";user nobody"
+        line: "user nobody"
+        state: present
+      become: true
+
+    - name: Uncomment group directive
+      lineinfile:
+        path: "/etc/openvpn/server/server.conf"
+        regexp: ";group nogroup"
+        line: "group nogroup"
+        state: present
+      become: true  
+
+    - name: Adjust IP forwarding
+      lineinfile:
+        path: "/etc/sysctl.conf"
+        line: "net.ipv4.ip_forward=1"
+        state: present
+      become: true
+
+    - name: Load new sysctl values
+      command: sysctl -p
+      become: true
+
+    - name: Add masquerading rules to UFW
+      lineinfile:
+        path: "/etc/ufw/before.rules"
+        regexp: "COMMIT"
+        inserafter: "# END OPENVPN RULES"
+        line: |
+          *nat
+          :POSTROUTING ACCEPT [0:0]
+          -A POSTROUTING -s 10.8.0.0/8 -o eth0 -j MASQUERADE
+          COMMIT
+      become: true
+
+    - name: Change UFW default forward policy
+      lineinfile:
+        path: "/etc/default/ufw"
+        regexp: "^DEFAULT_FORWARD_POLICY="
+        line: "DEFAULT_FORWARD_POLICY=\"ACCEPT\""
+        state: present
+      become: true
+
+    - name: Allow OpenVPN and SSH through UFW
+      ufw:
+        rule: allow
+        port: "1194/udp"
+      become: true
+
+    - name: Allow SSH traffic through UFW
+      ufw:
+        rule: allow
+        app: OpenSSH
+      become: true
+
+    - name: Disable UFW
+      command: ufw disable
+      become: true
+
+    - name: Enable UFW
+      command: ufw enable
+      become: true
+
+    - name: Enable OpenVPN service at boot
+      systemd:
+        name: openvpn-server@server.service
+        enabled: yes
+        masked: no
+      become: true
+
+    - name: Start OpenVPN service
+      systemd:
+        name: openvpn-server@server.service
+        state: started
+      become: true

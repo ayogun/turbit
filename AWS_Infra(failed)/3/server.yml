@@ -1,0 +1,121 @@
+# ---
+# - name: Set up OpenVPN server
+#   hosts: all
+#   become: true
+
+#   tasks:
+#     - name: Install OpenVPN and EasyRSA
+#       apt:
+#         name:
+#           - openvpn
+#           - easy-rsa
+#         state: present
+#         update_cache: yes
+
+#     - name: Copy EasyRSA scripts to the server
+#       copy:
+#         src: /usr/share/easy-rsa/
+#         dest: /etc/openvpn/
+#         remote_src: yes
+#         owner: root
+#         group: root
+#         mode: "0755"
+
+#     - name: Generate EasyRSA keys and certificates
+#       command: /etc/openvpn/easy-rsa/easyrsa init-pki
+#       args:
+#         chdir: /etc/openvpn/easy-rsa/
+
+#     - name: Build the Certificate Authority (CA)
+#       command: /etc/openvpn/easy-rsa/easyrsa build-ca nopass
+#       args:
+#         chdir: /etc/openvpn/easy-rsa/
+
+#     - name: Generate the server key and certificate
+#       command: /etc/openvpn/easy-rsa/easyrsa build-server-full server nopass
+#       args:
+#         chdir: /etc/openvpn/easy-rsa/
+
+#     - name: Generate Diffie-Hellman parameters
+#       command: /etc/openvpn/easy-rsa/easyrsa gen-dh
+#       args:
+#         chdir: /etc/openvpn/easy-rsa/
+
+#     - name: Copy OpenVPN configuration file
+#       template:
+#         src: server.conf.j2
+#         dest: /etc/openvpn/server.conf
+#         owner: root
+#         group: root
+#         mode: "0644"
+
+#     - name: Enable IP forwarding
+#       lineinfile:
+#         path: /etc/sysctl.conf
+#         line: "net.ipv4.ip_forward = 1"
+#         state: present
+
+#     - name: Apply IP forwarding configuration
+#       command: sysctl -p /etc/sysctl.conf
+
+#     - name: Start OpenVPN service
+#       service:
+#         name: openvpn
+#         state: started
+#         enabled: yes
+
+
+---
+- name: Configure VPN server
+  hosts: vpn
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      become: true
+
+    - name: Install OpenVPN
+      apt:
+        name: openvpn
+        state: present
+
+    - name: Configure OpenVPN server
+      copy:
+        dest: /etc/openvpn/server.conf
+        content: |
+          port 1194
+          proto udp
+          dev tun
+          ca /etc/openvpn/ca.crt
+          cert /etc/openvpn/server.crt
+          key /etc/openvpn/server.key
+          dh /etc/openvpn/dh.pem
+          server 10.8.0.0 255.255.255.0
+          ifconfig-pool-persist ipp.txt
+          push "route 192.168.33.0 255.255.255.0"
+          push "dhcp-option DNS 8.8.8.8"
+          keepalive 10 120
+          cipher AES-256-CBC
+          persist-key
+          persist-tun
+          status openvpn-status.log
+          verb 3
+      notify: restart openvpn
+
+    - name: Generate OpenVPN server keys
+      command: /usr/sbin/openvpn --genkey --secret /etc/openvpn/ta.key
+      args:
+        creates: /etc/openvpn/ta.key
+
+    - name: Copy OpenVPN keys and certificates
+      copy:
+        src: files/
+        dest: /etc/openvpn/
+      notify: restart openvpn
+
+  handlers:
+    - name: restart openvpn
+      service:
+        name: openvpn
+        state: restarted

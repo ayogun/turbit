@@ -1,0 +1,18 @@
+---
+- name: Install and configure MongoDB
+  hosts: all
+  become: true
+  
+  tasks:
+    - name: Install MongoDB   # Default port is 27017
+      apt:
+        update_cache: yes # Run the equivalent of apt-get update before the operation. Can be run as part of the package installation or as a separate step.
+        name: mongodb
+        state: present
+        
+
+    - name: Start MongoDB service
+      service:
+        name: mongodb
+        state: started
+        enabled: yes  # Whether the service should start on boot.

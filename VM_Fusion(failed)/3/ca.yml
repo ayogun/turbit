@@ -1,0 +1,103 @@
+---
+- name: Configure Certificate Authority
+  hosts: ca_server
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      become: true
+
+    - name: Install easy-rsa package
+      apt:
+        name: easy-rsa
+        state: present
+      become: true
+
+    - name: Create easy-rsa directory
+      file:
+        path: ~/easy-rsa
+        state: directory
+        owner: vagrant
+        mode: '0700'
+      become: true
+
+    - name: Create symbolic links to easy-rsa package files
+      file:
+        src: /usr/share/easy-rsa/{{ item }}
+        dest: ~/easy-rsa/{{ item | basename }}
+        state: link
+        owner: vagrant
+      with_fileglob:
+        - "/usr/share/easy-rsa/*"
+      become: true
+
+    - name: Restrict access to the PKI directory
+      file:
+        path: ~/easy-rsa/
+        state: directory
+        owner: vagrant
+        mode: '0700'
+      become: true
+
+    - name: Initialize PKI
+      command: ./easyrsa init-pki
+      args:
+        chdir: ~/easy-rsa
+      become: true
+
+    - name: Create vars file
+      copy:
+        dest: ~/easy-rsa/vars
+        content: |
+          set_var EASYRSA_REQ_COUNTRY    "US"
+          set_var EASYRSA_REQ_PROVINCE   "NewYork"
+          set_var EASYRSA_REQ_CITY       "New York City"
+          set_var EASYRSA_REQ_ORG        "DigitalOcean"
+          set_var EASYRSA_REQ_EMAIL      "admin@example.com"
+          set_var EASYRSA_REQ_OU         "Community"
+          set_var EASYRSA_ALGO           "ec"
+          set_var EASYRSA_DIGEST         "sha512"
+        owner: vagrant
+        mode: '0600'
+      become: true
+
+     - name: Run easy-rsa command to build CA
+      command: ./easyrsa build-ca nopass
+      args:
+        chdir: /path/to/easy-rsa/directory
+      become: true
+      become_user: root
+      become_method: sudo
+      register: build_ca_output
+
+    - name: Provide passphrase for the key pair
+      expect:
+        command: ./easyrsa build-ca nopass
+        args:
+          chdir: /path/to/easy-rsa/directory
+        responses:
+          "Enter New CA Key Passphrase:": "strong_passphrase"
+          "Re-Enter New CA Key Passphrase:": "strong_passphrase"
+          "Common Name (eg: your user, host, or server name) [Easy-RSA CA]:": "\n"  # Press ENTER to accept default
+        echo: no
+      become: true
+      become_user: root
+      become_method: sudo
+
+    - name: Copy ca.crt file to Kali Linux system
+      copy:
+        src: ~/easy-rsa/pki/ca.crt
+        dest: /tmp/ca.crt
+
+    - name: Import certificate on Kali Linux
+      block:
+        - name: Copy certificate to the appropriate directory
+          command: cp /tmp/ca.crt /usr/local/share/ca-certificates/
+
+        - name: Update the certificate store
+          command: update-ca-certificates --fresh
+      become: true
+      become_user: root
+      become_method: sudo

@@ -1,0 +1,28 @@
+---
+- name: Configure backup server
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Update apt cache & install MongoDB tools
+      apt:
+        update_cache: yes
+        name: mongo-tools
+        state: present
+      become: true
+
+    - name: Create backup script
+      copy:
+        dest: /usr/local/bin/backup.sh
+        content: |
+          #!/bin/bash
+          TIMESTAMP=$(date "+%Y%m%d-%H%M%S")
+          mongodump --host 192.168.33.10:27017 --out /var/backups/mongodb/$TIMESTAMP
+      #mode: '0755'   #Set the file mode to be executable
+
+    - name: Configure backup cron job
+      cron:
+        name: "mongodb backup"
+        job: "/usr/local/bin/backup.sh > /dev/null 2>&1"
+        user: root
+        minute: "*" # Run every minute
