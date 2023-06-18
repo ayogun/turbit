@@ -29,6 +29,28 @@
         hour: "*" # Run every hour
         #minute: "*" # Run every minute 
 
+    - name: Install OpenVPN
+      apt:
+        name: openvpn
+        state: present
     
+    - name: Copy OpenVPN client configuration
+      copy:
+        src: /path/to/client.ovpn  # Replace with the path to your client configuration file
+        dest: /etc/openvpn/client.conf
+    
+    - name: Install OpenVPN dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - resolvconf
+        - ca-certificates
+    
+    - name: Enable OpenVPN service
+      systemd:
+        name: openvpn@client
+        enabled: yes
+        state: started
 
         
