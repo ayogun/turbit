@@ -24,26 +24,76 @@
        line: 'bindIp: 192.168.33.10'
        state: present   # Thanks to this option I add the line if it doesn't exist at all
 
-    - name: Install OpenVPN
+######### Client #########
+
+    - name: Install OpenVPN on Ubuntu or Debian
       apt:
         name: openvpn
         state: present
+      become: true
+      become_user: root
+      become_method: sudo
+      when: ansible_distribution in ['Ubuntu', 'Debian']
 
-    - name: Copy OpenVPN client configuration
-      copy:
-        src: /path/to/client.ovpn  # Replace with the path to your client configuration file
-        dest: /etc/openvpn/client.conf
-    
-    - name: Install OpenVPN dependencies
-      apt:
-        name: "{{ item }}"
+    - name: Install OpenVPN on CentOS
+      dnf:
+        name: openvpn
         state: present
-      with_items:
-        - resolvconf
-        - ca-certificates
-    
-    - name: Enable OpenVPN service
-      systemd:
-        name: openvpn@client
-        enabled: yes
-        state: started
+      become: true
+      become_user: root
+      become_method: sudo
+      when: ansible_distribution == 'CentOS'
+
+    - name: Install openvpn-systemd-resolved on Ubuntu or Debian
+      apt:
+        name: openvpn-systemd-resolved
+        state: present
+      become: true
+      become_user: root
+      become_method: sudo
+      when: ansible_distribution in ['Ubuntu', 'Debian']
+
+    - name: Configure OpenVPN client for systemd-resolved
+      block:
+        - name: Uncomment lines in client configuration file for systemd-resolved
+          replace:
+            path: /path/to/client1.ovpn
+            regexp: '^#(script-security 2|up /etc/openvpn/update-systemd-resolved|down /etc/openvpn/update-systemd-resolved|down-pre|dhcp-option DOMAIN-ROUTE .)'
+            replace: '\1'
+          become: true
+          become_user: root
+          become_method: sudo
+          when: "'127.0.0.53' in lookup('file', '/etc/resolv.conf')"
+
+    - name: Configure OpenVPN client for update-resolv-conf
+      block:
+        - name: Uncomment lines in client configuration file for update-resolv-conf
+          replace:
+            path: /path/to/client1.ovpn
+            regexp: '^#(script-security 2|up /etc/openvpn/update-resolv-conf|down /etc/openvpn/update-resolv-conf)'
+            replace: '\1'
+          become: true
+          become_user: root
+          become_method: sudo
+          when: "'update-resolv-conf' in find.files(paths='/etc/openvpn/') | map(attribute='path') | list"
+
+    - name: Change 'nogroup' to 'nobody' in client configuration file on CentOS
+      replace:
+        path: /path/to/client1.ovpn
+        regexp: '^group nogroup$'
+        replace: 'group nobody'
+      become: true
+      become_user: root
+      become_method: sudo
+      when: ansible_distribution == 'CentOS'
+
+    - name: Connect to the VPN
+      command:
+        cmd: openvpn --config /path/to/client1.ovpn
+        creates: /var/run/openvpn/client1.pid
+      become: true
+      become_user: root
+      become_method: sudo
+
+
+
