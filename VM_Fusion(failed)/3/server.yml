@@ -2,7 +2,7 @@
 
 
 - name: Configure VPN server
-  hosts: openvpn_server
+  hosts: vpn
   become: true
   tasks:
     - name: Update apt cache
@@ -59,7 +59,7 @@
       command: sudo cp /home/vagrant/easy-rsa/pki/private/server.key /etc/openvpn/server/
 
 - name: Copy server certificate request to CA server
-  hosts: openvpn_server
+  hosts: vpn
   become: false
   gather_facts: false
   tasks:
@@ -71,7 +71,7 @@
      remote_user: vagrant
 
 - name: Sign the certificate request on CA server
-  hosts: ca_server
+  hosts: ca
   become: false
   gather_facts: false
   tasks:
@@ -90,7 +90,7 @@
           'Type the word '\''yes'\'' to continue, or any other input to abort.': 'yes'
 
 - name: Copy signed server certificate and CA certificate to OpenVPN server
-  hosts: openvpn_server
+  hosts: vpn
   become: true
   tasks:
     - name: Copy server.crt from CA server

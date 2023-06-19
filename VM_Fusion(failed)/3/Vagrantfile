@@ -3,7 +3,7 @@
 	config.vm.define "vpn" do |vpn|
 	  vpn.vm.box = "klinvill/kali_arm"
 	  vpn.vm.hostname = "vpn-vm"
-	  vpn.vm.network "private_network", ip: "172.16.16.30" # bug
+	  vpn.vm.network "private_network", ip: "172.16.16.37" # bug
 	  vpn.vm.network "public_network", bridge: "en0"
 	  vpn.ssh.username = "vagrant"
 	  vpn.ssh.password = "vagrant"	# This is not best practice, but it's a lab.
@@ -24,7 +24,7 @@
 	config.vm.define "ca" do |ca|
 		ca.vm.box = "klinvill/kali_arm"
 		ca.vm.hostname = "ca-vm"
-		ca.vm.network "private_network", ip: "172.16.16.40"
+		ca.vm.network "private_network", ip: "172.16.16.47"
 		ca.vm.network "public_network", bridge: "en0"
 		ca.ssh.username = "vagrant"
 		ca.ssh.password = "vagrant"	# This is not best practice, but it's a lab.

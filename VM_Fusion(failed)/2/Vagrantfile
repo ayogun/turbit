@@ -2,7 +2,7 @@ Vagrant.configure("2") do |config|
 	config.vm.define "backupServer" do |backup|
 	  backup.vm.box = "klinvill/kali_arm"
 	  backup.vm.hostname = "backup-vm"
-	  backup.vm.network "private_network", ip: "172.16.16.20" #bug
+	  backup.vm.network "private_network", ip: "172.16.16.27" #bug
 	  backup.vm.network "public_network", bridge: "en0"
 	  backup.ssh.username = "vagrant"
 	  backup.ssh.password = "vagrant"	# This is not best practice, but it's a lab. 
