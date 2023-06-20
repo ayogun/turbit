@@ -1,0 +1,24 @@
+---
+
+
+- name: Configure VPN server
+  hosts: vpn
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      become: true
+
+    - name: Clone Git repository
+      git:
+        repo: https://github.com/trailofbits/algo.git
+        dest: /home/vagrant/
+
+    - name: Capture and expose IP address
+      shell: hostname -I
+      register: ip_address_result
+
+    - name: Set IP address as environment variable
+      set_fact:
+        vpn_ip: "{{ ip_address_result.stdout }}"

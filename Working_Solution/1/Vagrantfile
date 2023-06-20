@@ -1,0 +1,26 @@
+Vagrant.configure("2") do |config|
+	config.vm.define "mongo" do |mongo|
+	  mongo.vm.box = "klinvill/kali_arm"
+	  mongo.vm.hostname = "mongo-vm"
+	  mongo.vm.network "private_network", ip: "172.16.15.8" # Here is a bug
+	  mongo.vm.network "public_network", bridge: "en0"
+	  mongo.ssh.username = "vagrant"
+	  mongo.ssh.password = "vagrant"	# This is not best practice, but it's a lab. 
+	  #mongo.ssh.host = "192.168.33.10"
+
+	  mongo.vm.provider "vmware_desktop" do |v|
+		v.vmx["numvcpus"] = "2"
+		v.vmx["memsize"] = "2048"
+		v.gui = true
+	  end
+	  mongo.vm.provision "ansible" do |ansible|
+		ansible.playbook = "mongo.yml"
+		ansible.groups = {
+			"mongogroup" => ["mongo-vm"]
+		}
+		# ansible.inventory_path = "inventory.ini"
+		# ansible.verbose = "v"
+	  end
+	end
+  end
+  
