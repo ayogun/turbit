@@ -13,12 +13,101 @@
     - name: Clone Git repository
       git:
         repo: https://github.com/trailofbits/algo.git
-        dest: /home/vagrant/
+        dest: /home/vagrant/algo
 
     - name: Capture and expose IP address
-      shell: hostname -I
+      shell: hostname --all-ip-addresses | awk '{print $1}'
       register: ip_address_result
 
     - name: Set IP address as environment variable
       set_fact:
         vpn_ip: "{{ ip_address_result.stdout }}"
+
+    - debug: msg="{{ ip_address_result.stdout }}"
+
+    - name: Take config files from algo/configs/{{ ip_address_result.stdout }}/wireguard
+      fetch:
+        src: "/home/vagrant/algo/configs/{{ ip_address_result.stdout }}/wireguard/laptop.conf"
+        dest: "/Users/ayogun/Desktop/turbit/Working_Solution/3/"
+        remote_src: true
+        owner: vagrant
+        group: vagrant
+        mode: 0600
+      become: true
+
+    - name: Take config files from algo/configs/{{ ip_address_result.stdout }}/wireguard to the host machine
+      fetch:
+        src: "/home/vagrant/algo/configs/{{ ip_address_result.stdout }}/wireguard/phone.conf"
+        dest: "/Users/ayogun/Desktop/turbit/Working_Solution/"
+        remote_src: true
+        owner: vagrant
+        group: vagrant
+        mode: 0600
+      become: true
+
+    # - name: Copy file from VPN server with sudo
+    #   fetch:
+    #     # src: "/home/vagrant/algo/configs/{{ ip_address_result.stdout }}/wireguard/mongo.conf"
+    #     src: "/home/vagrant/Desktop/ip_vpn.j2"
+    #     dest: "/Users/ayogun/Desktop/turbit/Working_Solution/3/ip_vpn.j2"
+    #     remote_src: true
+    #     flat: yes
+    #     fail_on_missing: yes
+
+# Here can be compatibility problem. will check later
+    - name: Install python3-virtualenv
+      apt:
+        name: python3-virtualenv      
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+        install_recommends: no
+
+    - name: Create virtual environment
+      shell: python3 -m virtualenv --python "$(which python3)" .env
+      args:
+        chdir: /home/vagrant/algo
+
+    - name: Activate virtual environment
+      command: /bin/bash -c 'source .env/bin/activate'
+      args:
+        chdir: /home/vagrant/algo
+    
+    - name: Upgrade pip and virtualenv
+      command: /home/vagrant/algo/.env/bin/python3 -m pip install -U pip virtualenv
+
+    - name: Install requirements
+      pip:
+        requirements: /home/vagrant/algo/requirements.txt
+        virtualenv: /home/vagrant/algo/.env
+
+###### python section over
+
+    - name: Run ./algo command
+      become: true
+      expect:
+        command: ./algo
+        responses: "{{ response_dict }}"
+        timeout: 120
+      args:
+        chdir: /home/vagrant/algo
+      vars:
+        response_dict:
+          'What provider would you like to use?.*':
+            ' '
+          'Do you want macOS/iOS clients to enable "Connect On Demand" when connected to cellular networks\?.*':
+            'n'
+          'Do you want macOS/iOS clients to enable "Connect On Demand" when connected to Wi-Fi\?.*':
+            'n'
+          'Do you want to retain the keys \(PKI\)\?.*':
+            'n'
+          'Do you want to enable DNS ad blocking on this VPN server\?.*':
+            'n'
+          'Do you want each user to have their own account for SSH tunneling\?.*':
+            'n'
+          'https://trailofbits\.github\.io/algo/deploy-to-ubuntu\.html.*':
+            ' '
+          'Enter the IP address of your server:.*':
+            'localhost'
+          'Enter the public IP address or domain name of your server:.*':
+            '{{ vpn_ip }}'

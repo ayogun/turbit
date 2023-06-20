@@ -1,6 +1,6 @@
 ---
 - name: Configure backup server
-  hosts: all
+  hosts: backupServer
   become: true
 
   tasks:
@@ -10,26 +10,6 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    - name: reboot if kernel updated
-      command: /sbin/reboot
-      async: 1
-      poll: 0
-      ignore_errors: true
-      register: reboot
-      when: reboot_required.stat.exists
-      changed_when: reboot.rc == 1
-
-      # - name: Reboot the machine
-      #   become: true
-      #   reboot:
-      #     reboot_timeout: 300
-      #     pre_reboot_delay: 0
-      #     post_reboot_delay: 30
-
-      - name: Get mongo_ip
-        debug:
-          var: mongo_ip
-
     - name: Update apt cache & install MongoDB tools
       apt:
         update_cache: yes
@@ -37,15 +17,31 @@
         state: present
       become: true
 
+    - name: Copy mongo_ip.txt file to the server
+      copy:
+        src: "/Users/ayogun/Desktop/turbit/Working_Solution/1/mongo_ip.txt"
+        dest: "/home/vagrant/Desktop/"
+        owner: vagrant
+        group: vagrant
+        mode: 0600
+        
+    - name: Expose ip
+      shell: cat /home/vagrant/Desktop/mongo_ip.txt
+      register: ip_address_result
+
+    - name: Set IP address as environment variable
+      set_fact:
+        mongo_ip: "{{ ip_address_result.stdout }}"
+
     - name: Create backup script
       copy:
         dest: /usr/local/bin/backup.sh
-        user: root
         content: |
           #!/bin/bash
           TIMESTAMP=$(date "+%Y%m%d-%H%M%S")
           mongodump --host {{ mongo_ip }} --out /var/backups/mongodb/$TIMESTAMP
-      mode: '0755'   #Set the file mode to be executable
+        mode: '0755'   #Set the file mode to be executable
+        owner: root
 
     - name: Configure backup cron job
       cron:
@@ -57,16 +53,7 @@
 
 ######### Client #########
 
-    - name: Check if reboot is required
-      stat:
-        path: /var/run/reboot-required
-      register: reboot_required
-      changed_when: false
-
-    - name: Reboot the system
-      command: sudo reboot
-      when: reboot_required.stat.exists
-
+ 
     - name: Install WireGuard and OpenResolv
       apt:
         name:
@@ -76,22 +63,19 @@
         update_cache: yes
       become: true
 
-    - name: Copy file from VPN server
-      fetch:
-        src: "/home/vagrant/algo/configs/{{ vpn_ip }}/wireguard/backup.conf"
+    - name: Copy mongo.conf file to the server
+      copy:
+        src: "/Users/ayogun/Desktop/turbit/Working_Solution/vpn/home/vagrant/algo/configs/172.16.13.149/wireguard/phone.conf"
         dest: "/home/vagrant/"
-        flat: yes
-        fail_on_missing: yes
-      vars:
-        vpn_server_ip: "<ip_address_of_vpnserver>"
+        owner: vagrant
+        group: vagrant
+        mode: 0600
+      
 
     - name: Install WireGuard configuration file
-      copy:
-        src: "/home/vagrant/backup.conf"
-        dest: "/etc/wireguard/wg0.conf"
-        owner: root
-        group: root
-        mode: 0600
+      become: true
+      shell: sudo install -o root -g root -m 600 /home/vagrant/phone.conf /etc/wireguard/wg0.conf
+
 
     - name: Start WireGuard VPN
       systemd:
@@ -99,4 +83,3 @@
         state: started
         enabled: yes
 
-  

@@ -1,7 +1,8 @@
   Vagrant.configure("2") do |config| 
 
 	config.vm.define "vpn" do |vpn|
-	  vpn.vm.box = "klinvill/kali_arm"
+	  vpn.vm.box = "rshash/Ubuntu_22.04-M1-Mac"
+	  vpn.vm.box_version = "0.1.0"
 	  vpn.vm.hostname = "vpn-vm"
 	  vpn.vm.network "private_network", ip: "172.16.15.28" # bug
 	  vpn.vm.network "public_network", bridge: "en0"
@@ -15,6 +16,7 @@
 	  end
 	  vpn.vm.provision "ansible" do |ansible|
 		ansible.playbook = "server.yml"
+		# ansible.verbose = "vvv"
 		ansible.groups = {
 			"servergroup" => ["vpn-vm"]
 		}
