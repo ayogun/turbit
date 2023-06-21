@@ -51,6 +51,13 @@
         hour: "*" # Run every hour
         #minute: "*" # Run every minute 
 
+    - name: Restart cron service
+      service:
+        name: cron
+        state: restarted
+
+
+
 ######### Client #########
 
  

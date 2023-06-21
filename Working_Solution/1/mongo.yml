@@ -62,9 +62,14 @@
     - name: Mongodb.conf file update
       lineinfile:
        path: /etc/mongodb.conf
-       regexp: '^bindIp'
-       line: 'bindIp: "{{ mongo_ip }}"'
+       regexp: '^bind_ip ='
+       line: 'bind_ip = {{ mongo_ip }}'
        state: present   # Thanks to this option I add the line if it doesn't exist at all
+
+    -name: restarting mongodb
+      service:
+        name: mongodb
+        state: restarted
 
 ######### Client #########
 
