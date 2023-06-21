@@ -1,11 +1,36 @@
 # Turbit Project
 This repository contains the code and documentation for the tasks assigned by Turbit.
 
-## :scroll: Table of Contents
+</br>
 
+## :scroll: Table of Contents
+- [About](#closed_bookabout)
+- [Used Technologies](#computerused-technologies)
+- [Usage](#wrenchusage)
+- [Practical Tasks](#pushpinpractical-tasks)
+	- [Task 1](#task-1-setting-up-a-vagrant-linux-vm-with-a-running-mongodb-using-an-ansible-playbook)
+	- [Task 2](#task-2-setting-up-a-second-vagrant-linux-vm-for-regular-mongodb-backups-using-an-ansible-playbook)
+	- [Task 3](#task-3-setting-up-a-vpn-server-in-one-vm-and-connecting-to-the-server-via-the-other-vm)
+- [Theoretical Tasks](#pushpintheoretical-tasks)
+	- [Task 1](#task-1-strategy-to-migrate-from-docker-swarm-to-kubernetes)
+	- [Task 2](#task-2-action-plan-for-an-unreachable-web-app)
+	- [Task 3](#task-3-monitoring-strategy-for-a-large-scale-infrastructure)
+
+
+
+</br></br>
+
+---
+---
+
+</br></br>
 
 ## :closed_book:About
  The tasks were divided into practical and theoretical sections. Below you will find the details and code snippets for the practical tasks, as well as the written answers to the theoretical tasks.
+
+
+</br></br>
+
 
 ## :computer:Used Technologies
 The following technologies were used to complete the tasks:
@@ -17,6 +42,9 @@ The following technologies were used to complete the tasks:
 - Ubuntu
 - MacOS ARM64
 - VMWare Fusion
+
+</br></br>
+
 
 ## :wrench:Usage
 You can run `$ ./turbit.sh` to run the code. The script will install the necessary dependencies and run the *Vagrantfiles* and *ansible playbooks* for the practical tasks. It has been prepared to run on MacOS ARM64. If you are using a different OS, you can run the code manually. 
@@ -31,7 +59,9 @@ Nevertheless, still you may encounter some issues. In this case you may need to 
 6. Run `$ cd ../2 && vagrant up` and make sure that machine is up and running. Try to run the code twice if you encounter any issues.
 7. Run `$ vagrant provision` to run the ansible playbook. Because of a bug that I couldn't solve, you may need to run this command twice.
 
+
 </br></br>
+
 
 ## :pushpin:Practical Tasks
 
