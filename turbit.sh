@@ -1,6 +1,6 @@
 #!/bin/bash
 
-RED= '\033[0;31m' 
+RED= '\033[0;31m' #Red color
 NC= '\033[0m' # No Color
 
 # Function to check if a command is available
